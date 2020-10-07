@@ -57,6 +57,7 @@ func TestReceiveMessageFromKafka(t *testing.T) {
 			Convey("Then an event should be published and the message should be transformed and published to the broker", func() {
 				So(<-consumer.event, ShouldNotBeNil)
 				So(mockBroker.AssertCalled(t, "Publish", "123"), ShouldBeTrue)
+				So(mockTransformer.AssertCalled(t, "Transform", []byte("abc")), ShouldBeTrue)
 			})
 		})
 	})
@@ -130,6 +131,7 @@ func TestSkipMessageIfTransformerReturnsError(t *testing.T) {
 			msgChannel <- &sarama.ConsumerMessage{Value: []byte("abc")}
 			Convey("Then an event should be published, the error should be logged and no further processing should be done", func() {
 				So(<-consumer.event, ShouldNotBeNil)
+				So(mockTransformer.AssertCalled(t, "Transform", []byte("abc")), ShouldBeTrue)
 				So(mockBroker.AssertNotCalled(t, "Publish", mock.Anything), ShouldBeTrue)
 				So(mockLogger.AssertCalled(t, "Error", theError, []log.Data{{}}), ShouldBeTrue)
 			})
