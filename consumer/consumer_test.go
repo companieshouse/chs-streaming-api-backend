@@ -6,6 +6,7 @@ import (
 	"github.com/companieshouse/chs.go/log"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/mock"
+	"sync"
 	"syscall"
 	"testing"
 )
@@ -35,6 +36,7 @@ func TestCreateNewConsumer(t *testing.T) {
 			So(actual.messageTransformer, ShouldNotBeNil)
 			So(actual.publisher, ShouldNotBeNil)
 			So(actual.systemEvents, ShouldNotBeNil)
+			So(actual.wg, ShouldBeNil)
 		})
 	})
 }
@@ -51,11 +53,13 @@ func TestReceiveMessageFromKafka(t *testing.T) {
 		mockPublisher := &mockPublisher{}
 		mockPublisher.On("Publish", "123").Return()
 		consumer := NewConsumer(mockKafkaConsumer, mockTransformer, mockPublisher, &mockLogger{})
+		consumer.wg = new(sync.WaitGroup)
 		go consumer.Run()
 		Convey("When a message is consumed from Kafka", func() {
+			consumer.wg.Add(1)
 			msgChannel <- &sarama.ConsumerMessage{Value: []byte("abc")}
+			consumer.wg.Wait()
 			Convey("Then an event should be published and the message should be transformed and published to the publisher", func() {
-				So(<-consumer.event, ShouldNotBeNil)
 				So(mockPublisher.AssertCalled(t, "Publish", "123"), ShouldBeTrue)
 				So(mockTransformer.AssertCalled(t, "Transform", []byte("abc")), ShouldBeTrue)
 			})
@@ -74,11 +78,13 @@ func TestReceiveSystemSignal(t *testing.T) {
 		mockTransformer := &mockTransformer{}
 		mockPublisher := &mockPublisher{}
 		consumer := NewConsumer(mockKafkaConsumer, mockTransformer, mockPublisher, &mockLogger{})
+		consumer.wg = new(sync.WaitGroup)
 		go consumer.Run()
 		Convey("When a system signal is received", func() {
+			consumer.wg.Add(1)
 			consumer.systemEvents <- syscall.SIGINT
+			consumer.wg.Wait()
 			Convey("Then an event should be published and the consumer should be closed", func() {
-				So(<-consumer.event, ShouldNotBeNil)
 				So(mockKafkaConsumer.AssertCalled(t, "Close"), ShouldBeTrue)
 			})
 		})
@@ -101,11 +107,13 @@ func TestLogErrorsReceivedFromKafka(t *testing.T) {
 		logger := &mockLogger{}
 		logger.On("Error", mock.Anything, mock.Anything).Return()
 		consumer := NewConsumer(mockKafkaConsumer, mockTransformer, mockPublisher, logger)
+		consumer.wg = new(sync.WaitGroup)
 		go consumer.Run()
 		Convey("When a message is consumed from Kafka", func() {
+			consumer.wg.Add(1)
 			errorChannel <- theError
+			consumer.wg.Wait()
 			Convey("Then an event should be published and the message should be transformed and published to the publisher", func() {
-				So(<-consumer.event, ShouldNotBeNil)
 				So(logger.AssertCalled(t, "Error", theError, []log.Data{{"topic": "the-topic"}}), ShouldBeTrue)
 			})
 		})
@@ -126,11 +134,13 @@ func TestSkipMessageIfTransformerReturnsError(t *testing.T) {
 		mockLogger := &mockLogger{}
 		mockLogger.On("Error", mock.Anything, mock.Anything).Return()
 		consumer := NewConsumer(mockKafkaConsumer, mockTransformer, mockPublisher, mockLogger)
+		consumer.wg = new(sync.WaitGroup)
 		go consumer.Run()
 		Convey("When an untransformable message is consumed from Kafka", func() {
+			consumer.wg.Add(1)
 			msgChannel <- &sarama.ConsumerMessage{Value: []byte("abc")}
+			consumer.wg.Wait()
 			Convey("Then an event should be published, the error should be logged and no further processing should be done", func() {
-				So(<-consumer.event, ShouldNotBeNil)
 				So(mockTransformer.AssertCalled(t, "Transform", []byte("abc")), ShouldBeTrue)
 				So(mockPublisher.AssertNotCalled(t, "Publish", mock.Anything), ShouldBeTrue)
 				So(mockLogger.AssertCalled(t, "Error", theError, []log.Data{{}}), ShouldBeTrue)
@@ -153,11 +163,13 @@ func TestLogErrorWhenClosingKafkaConsumer(t *testing.T) {
 		logger := &mockLogger{}
 		logger.On("Error", mock.Anything, mock.Anything).Return()
 		consumer := NewConsumer(mockKafkaConsumer, mockTransformer, mockPublisher, logger)
+		consumer.wg = new(sync.WaitGroup)
 		go consumer.Run()
 		Convey("When a system signal has been received", func() {
+			consumer.wg.Add(1)
 			consumer.systemEvents <- syscall.SIGINT
+			consumer.wg.Wait()
 			Convey("Then an event should be published and the error should be logged", func() {
-				So(<-consumer.event, ShouldNotBeNil)
 				So(logger.AssertCalled(t, "Error", theError, []log.Data{{}}), ShouldBeTrue)
 			})
 		})

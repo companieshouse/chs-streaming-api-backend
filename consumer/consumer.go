@@ -6,6 +6,7 @@ import (
 	"github.com/companieshouse/chs.go/log"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 )
 
@@ -27,7 +28,7 @@ type KafkaMessageConsumer struct {
 	publisher          Publishable
 	systemEvents       chan os.Signal
 	logger             logger.Logger
-	event              chan struct{}
+	wg                 *sync.WaitGroup
 }
 
 //Create a new consumer wrapper instance.
@@ -40,7 +41,6 @@ func NewConsumer(consumer consumer.PConsumer, messageTransformer Transformable, 
 		publisher:          publisher,
 		systemEvents:       systemEvents,
 		logger:             logger,
-		event:              make(chan struct{}),
 	}
 }
 
@@ -52,20 +52,28 @@ func (c *KafkaMessageConsumer) Run() {
 			result, err := c.messageTransformer.Transform(message.Value)
 			if err != nil {
 				c.logger.Error(err, log.Data{})
-				c.event <- struct{}{}
+				if c.wg != nil {
+					c.wg.Done()
+				}
 				continue
 			}
 			c.publisher.Publish(result)
-			c.event <- struct{}{}
+			if c.wg != nil {
+				c.wg.Done()
+			}
 		case <-c.systemEvents:
 			if err := c.kafkaConsumer.Close(); err != nil {
 				c.logger.Error(err, log.Data{})
 			}
-			c.event <- struct{}{}
+			if c.wg != nil {
+				c.wg.Done()
+			}
 			return
 		case err := <-c.kafkaConsumer.Errors():
 			c.logger.Error(err, log.Data{"topic": err.Topic})
-			c.event <- struct{}{}
+			if c.wg != nil {
+				c.wg.Done()
+			}
 		}
 	}
 }
