@@ -9,36 +9,42 @@ import (
 	"syscall"
 )
 
-type Transformer interface {
+//Describes an object capable of transforming on given representation into another.
+type Transformable interface {
 	Transform(message []byte) (string, error)
 }
 
-type Broker interface {
+//Describes an object capable of publishing a message.
+type Publishable interface {
 	Publish(msg string)
 }
 
+//Consumes messages from the associated partition consumer, transforms these into a desired format and publishes
+//transformed messages to clients.
 type KafkaMessageConsumer struct {
 	kafkaConsumer      consumer.PConsumer
-	messageTransformer Transformer
-	broker             Broker
+	messageTransformer Transformable
+	publisher          Publishable
 	systemEvents       chan os.Signal
 	logger             logger.Logger
 	event              chan struct{}
 }
 
-func NewConsumer(consumer consumer.PConsumer, messageTransformer Transformer, broker Broker, logger logger.Logger) *KafkaMessageConsumer {
+//Create a new consumer wrapper instance.
+func NewConsumer(consumer consumer.PConsumer, messageTransformer Transformable, publisher Publishable, logger logger.Logger) *KafkaMessageConsumer {
 	systemEvents := make(chan os.Signal)
 	signal.Notify(systemEvents, syscall.SIGINT, syscall.SIGTERM)
 	return &KafkaMessageConsumer{
 		kafkaConsumer:      consumer,
 		messageTransformer: messageTransformer,
-		broker:             broker,
+		publisher:          publisher,
 		systemEvents:       systemEvents,
 		logger:             logger,
 		event:              make(chan struct{}),
 	}
 }
 
+//Run this consumer instance.
 func (c *KafkaMessageConsumer) Run() {
 	for {
 		select {
@@ -49,7 +55,7 @@ func (c *KafkaMessageConsumer) Run() {
 				c.event <- struct{}{}
 				continue
 			}
-			c.broker.Publish(result)
+			c.publisher.Publish(result)
 			c.event <- struct{}{}
 		case <-c.systemEvents:
 			if err := c.kafkaConsumer.Close(); err != nil {
