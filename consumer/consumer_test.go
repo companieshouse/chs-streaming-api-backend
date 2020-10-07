@@ -54,7 +54,8 @@ func TestReceiveMessageFromKafka(t *testing.T) {
 		go consumer.Run()
 		Convey("When a message is consumed from Kafka", func() {
 			msgChannel <- &sarama.ConsumerMessage{Value: []byte("abc")}
-			Convey("Then the message should be transformed and published to the broker", func() {
+			Convey("Then an event should be published and the message should be transformed and published to the broker", func() {
+				So(<-consumer.event, ShouldNotBeNil)
 				So(mockBroker.AssertCalled(t, "Publish", "123"), ShouldBeTrue)
 			})
 		})
@@ -75,7 +76,8 @@ func TestReceiveSystemSignal(t *testing.T) {
 		go consumer.Run()
 		Convey("When a system signal is received", func() {
 			consumer.systemEvents <- syscall.SIGINT
-			Convey("Then the consumer should be closed", func() {
+			Convey("Then an event should be published and the consumer should be closed", func() {
+				So(<-consumer.event, ShouldNotBeNil)
 				So(kafkaConsumer.AssertCalled(t, "Close"), ShouldBeTrue)
 			})
 		})
@@ -101,7 +103,8 @@ func TestLogErrorsReceivedFromKafka(t *testing.T) {
 		go consumer.Run()
 		Convey("When a message is consumed from Kafka", func() {
 			errorChannel <- theError
-			Convey("Then the message should be transformed and published to the broker", func() {
+			Convey("Then an event should be published and the message should be transformed and published to the broker", func() {
+				So(<-consumer.event, ShouldNotBeNil)
 				So(logger.AssertCalled(t, "Error", theError, []log.Data{{"topic": "the-topic"}}), ShouldBeTrue)
 			})
 		})
@@ -125,7 +128,8 @@ func TestSkipMessageIfTransformerReturnsError(t *testing.T) {
 		go consumer.Run()
 		Convey("When an untransformable message is consumed from Kafka", func() {
 			msgChannel <- &sarama.ConsumerMessage{Value: []byte("abc")}
-			Convey("Then the error returned by the transformer should be logged and no further processing should be done", func() {
+			Convey("Then an event should be published, the error should be logged and no further processing should be done", func() {
+				So(<-consumer.event, ShouldNotBeNil)
 				So(mockBroker.AssertNotCalled(t, "Publish", mock.Anything), ShouldBeTrue)
 				So(mockLogger.AssertCalled(t, "Error", theError, []log.Data{{}}), ShouldBeTrue)
 			})
@@ -150,7 +154,8 @@ func TestLogErrorWhenClosingKafkaConsumer(t *testing.T) {
 		go consumer.Run()
 		Convey("When a system signal has been received", func() {
 			consumer.systemEvents <- syscall.SIGINT
-			Convey("Then the error should be logged", func() {
+			Convey("Then an event should be published and the error should be logged", func() {
+				So(<-consumer.event, ShouldNotBeNil)
 				So(logger.AssertCalled(t, "Error", theError, []log.Data{{}}), ShouldBeTrue)
 			})
 		})

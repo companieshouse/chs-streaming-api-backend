@@ -23,6 +23,7 @@ type KafkaMessageConsumer struct {
 	broker             Broker
 	systemEvents       chan os.Signal
 	logger             logger.Logger
+	event              chan struct{}
 }
 
 func NewConsumer(consumer consumer.PConsumer, messageTransformer Transformer, broker Broker, logger logger.Logger) *KafkaMessageConsumer {
@@ -34,6 +35,7 @@ func NewConsumer(consumer consumer.PConsumer, messageTransformer Transformer, br
 		broker:             broker,
 		systemEvents:       systemEvents,
 		logger:             logger,
+		event:              make(chan struct{}),
 	}
 }
 
@@ -44,16 +46,20 @@ func (c *KafkaMessageConsumer) Run() {
 			result, err := c.messageTransformer.Transform(message.Value)
 			if err != nil {
 				c.logger.Error(err, log.Data{})
+				c.event <- struct{}{}
 				continue
 			}
 			c.broker.Publish(result)
+			c.event <- struct{}{}
 		case <-c.systemEvents:
 			if err := c.kafkaConsumer.Close(); err != nil {
 				c.logger.Error(err, log.Data{})
 			}
+			c.event <- struct{}{}
 			return
 		case err := <-c.kafkaConsumer.Errors():
 			c.logger.Error(err, log.Data{"topic": err.Topic})
+			c.event <- struct{}{}
 		}
 	}
 }
