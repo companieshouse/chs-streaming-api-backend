@@ -6,6 +6,7 @@ import (
 	"github.com/companieshouse/chs.go/log"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/mock"
+	"net/http"
 	"sync"
 	"syscall"
 	"testing"
@@ -206,4 +207,8 @@ func (l *mockLogger) Error(err error, data ...log.Data) {
 
 func (l *mockLogger) Info(msg string, data ...log.Data) {
 	l.Called(msg, data)
+}
+
+func (l *mockLogger) InfoR(req *http.Request, msg string, data ...log.Data) {
+	l.Called(req, msg, data)
 }
