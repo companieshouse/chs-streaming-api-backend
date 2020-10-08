@@ -3,7 +3,6 @@ package transformer
 import (
 	"errors"
 	"github.com/companieshouse/chs-streaming-api-backend/model"
-	"github.com/companieshouse/chs-streaming-api-backend/model/avro"
 	rcd "github.com/companieshouse/chs-streaming-api-backend/model/json"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/mock"
@@ -14,222 +13,101 @@ type mockDeserialiser struct {
 	mock.Mock
 }
 
-type mockAvroDeserialiser struct {
-	mock.Mock
-	dataAbsent bool
-}
-
 type mockSerialiser struct {
 	mock.Mock
-}
-
-var expectedAvroData = avro.ResourceChangedData{
-	ResourceKind: "ResourceKind",
-	ResourceURI:  "ResourceURI",
-	ContextID:    "ContextID",
-	ResourceID:   "ResourceID",
-	Data:         "Data",
-	Event: avro.EventRecord{
-		PublishedAt:   "PublishedAt",
-		Type:          "Type",
-		FieldsChanged: []string{"Field"},
-	},
-}
-
-var expectedJsonData = rcd.ResourceChangedData{
-	ResourceKind: "ResourceKind",
-	ResourceURI:  "ResourceURI",
-	ResourceID:   "ResourceID",
-	Data: map[string]interface{}(nil),
-	Event:        rcd.Event{
-		FieldsChanged: []string{"Field"},
-		Timepoint:     3,
-		PublishedAt:   "PublishedAt",
-		Type:          "Type",
-	},
 }
 
 func TestCreateNewTransformerInstance(t *testing.T) {
 	Convey("When a new transformer is created", t, func() {
 		deserialiser := &mockDeserialiser{}
-		dataDeserialiser := &mockDeserialiser{}
-		dataSerialiser := &mockSerialiser{}
-		responseSerialiser := &mockSerialiser{}
-		actual := NewResourceChangedDataTransformer(deserialiser, dataDeserialiser, dataSerialiser, responseSerialiser)
+		serialiser := &mockSerialiser{}
+		actual := NewResourceChangedDataTransformer(deserialiser, serialiser)
 		Convey("Then a new transformer instance should be returned", func() {
 			So(actual, ShouldHaveSameTypeAs, &ResourceChangedDataTransformer{})
 			So(actual.deserialiser, ShouldEqual, deserialiser)
-			So(actual.dataDeserialiser, ShouldEqual, dataDeserialiser)
-			So(actual.resourceDataSerialiser, ShouldEqual, dataSerialiser)
-			So(actual.responseSerialiser, ShouldEqual, responseSerialiser)
+			So(actual.serialiser, ShouldEqual, serialiser)
 		})
 	})
 }
 
-func TestConvertResourceChangedDataMessageToJson(t *testing.T) {
+func TestTransformResourceChangedDataMessage(t *testing.T) {
 	Convey("Given a new transformer has been created", t, func() {
-		deserialiser := &mockAvroDeserialiser{}
-		dataDeserialiser := &mockDeserialiser{}
-		dataSerialiser := &mockSerialiser{}
-		responseSerialiser := &mockSerialiser{}
-		deserialiser.On("Unmarshal", []byte("cat"), mock.Anything).Return(nil)
-		dataDeserialiser.On("Unmarshal", []byte("Data"), mock.Anything).Return(nil)
-		dataSerialiser.On("Marshal", mock.Anything).Return([]byte("dog"), nil)
-		responseSerialiser.On("Marshal", mock.Anything).Return([]byte("result"), nil)
-		transformer := NewResourceChangedDataTransformer(deserialiser, dataDeserialiser, dataSerialiser, responseSerialiser)
-		Convey("When an incoming resource changed data message is transformed", func() {
-			actual, err := transformer.Transform(&model.BackendEvent{Data: []byte("cat"), Offset: 3})
-			Convey("Then the message should be deserialised with the deserialiser and reserialised with the serialiser", func() {
+		event := &model.BackendEvent{
+			Data:   []byte("data"),
+			Offset: 3,
+		}
+		data := &rcd.ResourceChangedData{}
+		deserialiser := &mockDeserialiser{}
+		deserialiser.On("Deserialise", mock.Anything).Return(data, nil)
+		serialiser := &mockSerialiser{}
+		serialiser.On("Serialise", mock.Anything).Return([]byte("result"), nil)
+		transformer := NewResourceChangedDataTransformer(deserialiser, serialiser)
+		Convey("When a resource changed data message is transformed", func() {
+			actual, err := transformer.Transform(event)
+			Convey("Then the expected result should be returned", func() {
 				So(actual, ShouldResemble, []byte("result"))
 				So(err, ShouldBeNil)
-				So(deserialiser.AssertCalled(t, "Unmarshal", []byte("cat"), &expectedAvroData), ShouldBeTrue)
-				So(dataDeserialiser.AssertCalled(t, "Unmarshal", []byte("Data"), &expectedJsonData.Data), ShouldBeTrue)
-				So(dataSerialiser.AssertCalled(t, "Marshal", expectedJsonData), ShouldBeTrue)
-				So(responseSerialiser.AssertCalled(t, "Marshal", &result{data: "dog", offset: 3}), ShouldBeTrue)
+				So(deserialiser.AssertCalled(t, "Deserialise", event), ShouldBeTrue)
+				So(serialiser.AssertCalled(t, "Serialise", data), ShouldBeTrue)
 			})
 		})
 	})
 }
 
-func TestReturnErrorIfMessageNotDeserialisable(t *testing.T) {
+func TestReturnErrorIfDeserialisationFails(t *testing.T) {
 	Convey("Given a new transformer has been created", t, func() {
-		deserialiser := &mockAvroDeserialiser{}
-		dataDeserialiser := &mockDeserialiser{}
-		dataSerialiser := &mockSerialiser{}
-		responseSerialiser := &mockSerialiser{}
 		expectedError := errors.New("something went wrong")
-		deserialiser.On("Unmarshal", []byte("cat"), mock.Anything).Return(expectedError)
-		transformer := NewResourceChangedDataTransformer(deserialiser, dataDeserialiser, dataSerialiser, responseSerialiser)
-		Convey("When an unreadable message is transformed", func() {
-			actual, err := transformer.Transform(&model.BackendEvent{Data: []byte("cat"), Offset: 3})
-			Convey("Then an error should be returned", func() {
+		event := &model.BackendEvent{
+			Data:   []byte("data"),
+			Offset: 3,
+		}
+		deserialiser := &mockDeserialiser{}
+		deserialiser.On("Deserialise", mock.Anything).Return((*rcd.ResourceChangedData)(nil), expectedError)
+		serialiser := &mockSerialiser{}
+		transformer := NewResourceChangedDataTransformer(deserialiser, serialiser)
+		Convey("When a resource changed data message is transformed", func() {
+			actual, err := transformer.Transform(event)
+			Convey("Then the expected result should be returned", func() {
 				So(actual, ShouldBeNil)
 				So(err, ShouldEqual, expectedError)
-				So(deserialiser.AssertCalled(t, "Unmarshal", []byte("cat"), &expectedAvroData), ShouldBeTrue)
-				So(dataDeserialiser.AssertNotCalled(t, "Unmarshal", mock.Anything, mock.Anything), ShouldBeTrue)
-				So(dataSerialiser.AssertNotCalled(t, "Marshal", mock.Anything), ShouldBeTrue)
-				So(responseSerialiser.AssertNotCalled(t, "Marshal", mock.Anything), ShouldBeTrue)
+				So(deserialiser.AssertCalled(t, "Deserialise", event), ShouldBeTrue)
+				So(serialiser.AssertNotCalled(t, "Serialise", mock.Anything), ShouldBeTrue)
 			})
 		})
 	})
 }
 
-func TestReturnErrorIfDeserialisedMessageDataNotDeserialisable(t *testing.T) {
+func TestReturnErrorIfSerialisationFails(t *testing.T) {
 	Convey("Given a new transformer has been created", t, func() {
-		deserialiser := &mockAvroDeserialiser{}
-		dataDeserialiser := &mockDeserialiser{}
-		dataSerialiser := &mockSerialiser{}
-		responseSerialiser := &mockSerialiser{}
 		expectedError := errors.New("something went wrong")
-		deserialiser.On("Unmarshal", []byte("cat"), mock.Anything).Return(nil)
-		dataDeserialiser.On("Unmarshal", mock.Anything, mock.Anything).Return(expectedError)
-		transformer := NewResourceChangedDataTransformer(deserialiser, dataDeserialiser, dataSerialiser, responseSerialiser)
-		Convey("When an unreadable message is transformed", func() {
-			actual, err := transformer.Transform(&model.BackendEvent{Data: []byte("cat"), Offset: 3})
-			Convey("Then an error should be returned", func() {
+		event := &model.BackendEvent{
+			Data:   []byte("data"),
+			Offset: 3,
+		}
+		data := &rcd.ResourceChangedData{}
+		deserialiser := &mockDeserialiser{}
+		deserialiser.On("Deserialise", mock.Anything).Return(data, nil)
+		serialiser := &mockSerialiser{}
+		serialiser.On("Serialise", mock.Anything).Return([]byte(nil), expectedError)
+		transformer := NewResourceChangedDataTransformer(deserialiser, serialiser)
+		Convey("When a resource changed data message is transformed", func() {
+			actual, err := transformer.Transform(event)
+			Convey("Then the expected result should be returned", func() {
 				So(actual, ShouldBeNil)
 				So(err, ShouldEqual, expectedError)
-				So(deserialiser.AssertCalled(t, "Unmarshal", []byte("cat"), &expectedAvroData), ShouldBeTrue)
-				So(dataDeserialiser.AssertCalled(t, "Unmarshal", []byte("Data"), &expectedJsonData.Data), ShouldBeTrue)
-				So(dataSerialiser.AssertNotCalled(t, "Marshal", mock.Anything), ShouldBeTrue)
-				So(responseSerialiser.AssertNotCalled(t, "Marshal", mock.Anything), ShouldBeTrue)
+				So(deserialiser.AssertCalled(t, "Deserialise", event), ShouldBeTrue)
+				So(serialiser.AssertCalled(t, "Serialise", data), ShouldBeTrue)
 			})
 		})
 	})
 }
 
-func TestReturnErrorIfDeserialisedMessageNotSerialisable(t *testing.T) {
-	Convey("Given a new transformer has been created", t, func() {
-		deserialiser := &mockAvroDeserialiser{}
-		dataDeserialiser := &mockDeserialiser{}
-		dataSerialiser := &mockSerialiser{}
-		responseSerialiser := &mockSerialiser{}
-		expectedError := errors.New("something went wrong")
-		deserialiser.On("Unmarshal", []byte("cat"), mock.Anything).Return(nil)
-		dataDeserialiser.On("Unmarshal", mock.Anything, mock.Anything).Return(nil)
-		dataSerialiser.On("Marshal", mock.Anything).Return([]byte(nil), expectedError)
-		transformer := NewResourceChangedDataTransformer(deserialiser, dataDeserialiser, dataSerialiser, responseSerialiser)
-		Convey("When an incoming resource changed data message is transformed", func() {
-			actual, err := transformer.Transform(&model.BackendEvent{Data: []byte("cat"), Offset: 3})
-			Convey("Then the message should be deserialised with the deserialiser and reserialised with the serialiser", func() {
-				So(actual, ShouldBeNil)
-				So(err, ShouldEqual, expectedError)
-				So(deserialiser.AssertCalled(t, "Unmarshal", []byte("cat"), &expectedAvroData), ShouldBeTrue)
-				So(dataDeserialiser.AssertCalled(t, "Unmarshal", []byte("Data"), &expectedJsonData.Data), ShouldBeTrue)
-				So(dataSerialiser.AssertCalled(t, "Marshal", expectedJsonData), ShouldBeTrue)
-				So(responseSerialiser.AssertNotCalled(t, "Marshal", mock.Anything), ShouldBeTrue)
-			})
-		})
-	})
+func (d *mockDeserialiser) Deserialise(model *model.BackendEvent) (*rcd.ResourceChangedData, error) {
+	args := d.Called(model)
+	return args.Get(0).(*rcd.ResourceChangedData), args.Error(1)
 }
 
-func TestReturnErrorIfMappedMessageNotSerialisable(t *testing.T) {
-	Convey("Given a new transformer has been created", t, func() {
-		deserialiser := &mockAvroDeserialiser{}
-		dataDeserialiser := &mockDeserialiser{}
-		dataSerialiser := &mockSerialiser{}
-		responseSerialiser := &mockSerialiser{}
-		expectedError := errors.New("something went wrong")
-		deserialiser.On("Unmarshal", []byte("cat"), mock.Anything).Return(nil)
-		dataDeserialiser.On("Unmarshal", []byte("Data"), mock.Anything).Return(nil)
-		dataSerialiser.On("Marshal", mock.Anything).Return([]byte("dog"), nil)
-		responseSerialiser.On("Marshal", mock.Anything).Return([]byte(nil), expectedError)
-		transformer := NewResourceChangedDataTransformer(deserialiser, dataDeserialiser, dataSerialiser, responseSerialiser)
-		Convey("When an incoming resource changed data message is transformed", func() {
-			actual, err := transformer.Transform(&model.BackendEvent{Data: []byte("cat"), Offset: 3})
-			Convey("Then the message should be deserialised with the deserialiser and reserialised with the serialiser", func() {
-				So(actual, ShouldBeNil)
-				So(err, ShouldEqual, expectedError)
-				So(deserialiser.AssertCalled(t, "Unmarshal", []byte("cat"), &expectedAvroData), ShouldBeTrue)
-				So(dataDeserialiser.AssertCalled(t, "Unmarshal", []byte("Data"), &expectedJsonData.Data), ShouldBeTrue)
-				So(dataSerialiser.AssertCalled(t, "Marshal", expectedJsonData), ShouldBeTrue)
-				So(responseSerialiser.AssertCalled(t, "Marshal", &result{data: "dog", offset: 3}), ShouldBeTrue)
-			})
-		})
-	})
-}
-
-func TestReturnErrorIfMessageDataAbsent(t *testing.T) {
-	Convey("Given a new transformer has been created", t, func() {
-		deserialiser := &mockAvroDeserialiser{dataAbsent: true}
-		deserialiser.On("Unmarshal", []byte("cat"), mock.Anything).Return(nil)
-		dataDeserialiser := &mockDeserialiser{}
-		dataSerialiser := &mockSerialiser{}
-		responseSerialiser := &mockSerialiser{}
-		avroData := expectedAvroData
-		avroData.Data = ""
-		transformer := NewResourceChangedDataTransformer(deserialiser, dataDeserialiser, dataSerialiser, responseSerialiser)
-		Convey("When an unreadable message is transformed", func() {
-			actual, err := transformer.Transform(&model.BackendEvent{Data: []byte("cat"), Offset: 3})
-			Convey("Then an error should be returned", func() {
-				So(actual, ShouldBeNil)
-				So(err.Error(), ShouldEqual, "no message data provided")
-				So(deserialiser.AssertCalled(t, "Unmarshal", []byte("cat"), &avroData), ShouldBeTrue)
-				So(dataDeserialiser.AssertNotCalled(t, "Unmarshal", mock.Anything, mock.Anything), ShouldBeTrue)
-				So(dataSerialiser.AssertNotCalled(t, "Marshal", mock.Anything), ShouldBeTrue)
-				So(responseSerialiser.AssertNotCalled(t, "Marshal", mock.Anything), ShouldBeTrue)
-			})
-		})
-	})
-}
-
-func (d *mockDeserialiser) Unmarshal(input []byte, output interface{}) error {
-	args := d.Called(input, output)
-	return args.Error(0)
-}
-
-func (d *mockAvroDeserialiser) Unmarshal(input []byte, output interface{}) error {
-	args := d.Called(input, output)
-	myOutput := output.(*avro.ResourceChangedData)
-	avroData := expectedAvroData
-	if d.dataAbsent {
-		avroData.Data = ""
-	}
-	*myOutput = avroData
-	return args.Error(0)
-}
-
-func (s *mockSerialiser) Marshal(input interface{}) ([]byte, error) {
-	args := s.Called(input)
+func (s *mockSerialiser) Serialise(jsonData *rcd.ResourceChangedData) ([]byte, error) {
+	args := s.Called(jsonData)
 	return args.Get(0).([]byte), args.Error(1)
 }

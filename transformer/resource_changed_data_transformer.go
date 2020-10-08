@@ -1,66 +1,41 @@
 package transformer
 
 import (
-	"errors"
 	"github.com/companieshouse/chs-streaming-api-backend/model"
-	"github.com/companieshouse/chs-streaming-api-backend/model/avro"
 	"github.com/companieshouse/chs-streaming-api-backend/model/json"
 )
 
-type Serialisable interface {
-	Marshal(input interface{}) ([]byte, error)
-}
-
-type Deserialisable interface {
-	Unmarshal(input []byte, model interface{}) error
-}
-
+//Transforms a resource changed data message into a message used by streaming API cache.
 type ResourceChangedDataTransformer struct {
-	deserialiser           Deserialisable
-	dataDeserialiser       Deserialisable
-	resourceDataSerialiser Serialisable
-	responseSerialiser     Serialisable
+	deserialiser Deserialisable
+	serialiser   Serialisable
 }
 
-type result struct {
-	data   string
-	offset int64
+//Describes an object capable of deserialising an incoming resource changed data message into a data structure
+//that will be consumed by streaming API frontend users.
+type Deserialisable interface {
+	Deserialise(model *model.BackendEvent) (*json.ResourceChangedData, error)
 }
 
-func NewResourceChangedDataTransformer(deserialisable Deserialisable, dataDeserialiser Deserialisable, resourceDataSerialiser Serialisable, responseSerialiser Serialisable) *ResourceChangedDataTransformer {
+//Describes an object capable of serialising a resource changed data object into a message that can be used by the
+//streaming API cache.
+type Serialisable interface {
+	Serialise(jsonData *json.ResourceChangedData) ([]byte, error)
+}
+
+//Construct a new resource changed data transformer instance.
+func NewResourceChangedDataTransformer(deserialiser Deserialisable, serialiser Serialisable) *ResourceChangedDataTransformer {
 	return &ResourceChangedDataTransformer{
-		deserialiser:           deserialisable,
-		dataDeserialiser:       dataDeserialiser,
-		resourceDataSerialiser: resourceDataSerialiser,
-		responseSerialiser:     responseSerialiser,
+		deserialiser: deserialiser,
+		serialiser:   serialiser,
 	}
 }
 
+//Transform the provided resource changed data message into a format usable by streaming API cache.
 func (t *ResourceChangedDataTransformer) Transform(model *model.BackendEvent) ([]byte, error) {
-	avroData := avro.ResourceChangedData{}
-	if err := t.deserialiser.Unmarshal(model.Data, &avroData); err != nil {
-		return nil, err
-	}
-	if len(avroData.Data) == 0 {
-		return nil, errors.New("no message data provided")
-	}
-	jsonData := json.ResourceChangedData{
-		ResourceKind: avroData.ResourceKind,
-		ResourceURI:  avroData.ResourceURI,
-		ResourceID:   avroData.ResourceID,
-		Event: json.Event{
-			FieldsChanged: avroData.Event.FieldsChanged,
-			Timepoint:     model.Offset,
-			PublishedAt:   avroData.Event.PublishedAt,
-			Type:          avroData.Event.Type,
-		},
-	}
-	if err := t.dataDeserialiser.Unmarshal([]byte(avroData.Data), &jsonData.Data); err != nil {
-		return nil, err
-	}
-	transformedData, err := t.resourceDataSerialiser.Marshal(jsonData)
+	jsonData, err := t.deserialiser.Deserialise(model)
 	if err != nil {
 		return nil, err
 	}
-	return t.responseSerialiser.Marshal(&result{data: string(transformedData), offset: model.Offset})
+	return t.serialiser.Serialise(jsonData)
 }
