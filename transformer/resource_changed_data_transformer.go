@@ -1,6 +1,7 @@
 package transformer
 
 import (
+	"errors"
 	"github.com/companieshouse/chs-streaming-api-backend/model"
 	"github.com/companieshouse/chs-streaming-api-backend/model/avro"
 	"github.com/companieshouse/chs-streaming-api-backend/model/json"
@@ -39,6 +40,9 @@ func (t *ResourceChangedDataTransformer) Transform(model *model.BackendEvent) ([
 	avroData := avro.ResourceChangedData{}
 	if err := t.deserialiser.Unmarshal(model.Data, &avroData); err != nil {
 		return nil, err
+	}
+	if len(avroData.Data) == 0 {
+		return nil, errors.New("no message data provided")
 	}
 	jsonData := json.ResourceChangedData{
 		ResourceKind: avroData.ResourceKind,

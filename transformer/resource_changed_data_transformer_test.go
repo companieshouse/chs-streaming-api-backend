@@ -16,6 +16,7 @@ type mockDeserialiser struct {
 
 type mockAvroDeserialiser struct {
 	mock.Mock
+	dataAbsent bool
 }
 
 type mockSerialiser struct {
@@ -188,6 +189,30 @@ func TestReturnErrorIfMappedMessageNotSerialisable(t *testing.T) {
 	})
 }
 
+func TestReturnErrorIfMessageDataAbsent(t *testing.T) {
+	Convey("Given a new transformer has been created", t, func() {
+		deserialiser := &mockAvroDeserialiser{dataAbsent: true}
+		deserialiser.On("Unmarshal", []byte("cat"), mock.Anything).Return(nil)
+		dataDeserialiser := &mockDeserialiser{}
+		dataSerialiser := &mockSerialiser{}
+		responseSerialiser := &mockSerialiser{}
+		avroData := expectedAvroData
+		avroData.Data = ""
+		transformer := NewResourceChangedDataTransformer(deserialiser, dataDeserialiser, dataSerialiser, responseSerialiser)
+		Convey("When an unreadable message is transformed", func() {
+			actual, err := transformer.Transform(&model.BackendEvent{Data: []byte("cat"), Offset: 3})
+			Convey("Then an error should be returned", func() {
+				So(actual, ShouldBeNil)
+				So(err.Error(), ShouldEqual, "no message data provided")
+				So(deserialiser.AssertCalled(t, "Unmarshal", []byte("cat"), &avroData), ShouldBeTrue)
+				So(dataDeserialiser.AssertNotCalled(t, "Unmarshal", mock.Anything, mock.Anything), ShouldBeTrue)
+				So(dataSerialiser.AssertNotCalled(t, "Marshal", mock.Anything), ShouldBeTrue)
+				So(responseSerialiser.AssertNotCalled(t, "Marshal", mock.Anything), ShouldBeTrue)
+			})
+		})
+	})
+}
+
 func (d *mockDeserialiser) Unmarshal(input []byte, output interface{}) error {
 	args := d.Called(input, output)
 	return args.Error(0)
@@ -196,7 +221,11 @@ func (d *mockDeserialiser) Unmarshal(input []byte, output interface{}) error {
 func (d *mockAvroDeserialiser) Unmarshal(input []byte, output interface{}) error {
 	args := d.Called(input, output)
 	myOutput := output.(*avro.ResourceChangedData)
-	*myOutput = expectedAvroData
+	avroData := expectedAvroData
+	if d.dataAbsent {
+		avroData.Data = ""
+	}
+	*myOutput = avroData
 	return args.Error(0)
 }
 
