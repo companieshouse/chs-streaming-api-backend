@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"github.com/companieshouse/chs-streaming-api-backend/logger"
+	"github.com/companieshouse/chs-streaming-api-backend/model"
 	"github.com/companieshouse/chs.go/kafka/consumer"
 	"github.com/companieshouse/chs.go/log"
 	"os"
@@ -12,7 +13,7 @@ import (
 
 //Describes an object capable of transforming on given representation into another.
 type Transformable interface {
-	Transform(message []byte) (string, error)
+	Transform(message *model.BackendEvent) (string, error)
 }
 
 //Describes an object capable of publishing a message.
@@ -49,7 +50,10 @@ func (c *KafkaMessageConsumer) Run() {
 	for {
 		select {
 		case message := <-c.kafkaConsumer.Messages():
-			result, err := c.messageTransformer.Transform(message.Value)
+			result, err := c.messageTransformer.Transform(&model.BackendEvent{
+				Data:   message.Value,
+				Offset: message.Offset,
+			})
 			if err != nil {
 				c.logger.Error(err, log.Data{})
 				if c.wg != nil {

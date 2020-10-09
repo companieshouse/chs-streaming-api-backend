@@ -3,6 +3,7 @@ package consumer
 import (
 	"errors"
 	"github.com/Shopify/sarama"
+	"github.com/companieshouse/chs-streaming-api-backend/model"
 	"github.com/companieshouse/chs.go/log"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/mock"
@@ -50,19 +51,19 @@ func TestReceiveMessageFromKafka(t *testing.T) {
 		mockKafkaConsumer.On("Messages").Return(msgChannel)
 		mockKafkaConsumer.On("Errors").Return(errorChannel)
 		mockTransformer := &mockTransformer{}
-		mockTransformer.On("Transform", []byte("abc")).Return("123", nil)
+		mockTransformer.On("Transform", mock.Anything).Return("123", nil)
 		mockPublisher := &mockPublisher{}
-		mockPublisher.On("Publish", "123").Return()
+		mockPublisher.On("Publish", mock.Anything).Return()
 		consumer := NewConsumer(mockKafkaConsumer, mockTransformer, mockPublisher, &mockLogger{})
 		consumer.wg = new(sync.WaitGroup)
 		go consumer.Run()
 		Convey("When a message is consumed from Kafka", func() {
 			consumer.wg.Add(1)
-			msgChannel <- &sarama.ConsumerMessage{Value: []byte("abc")}
+			msgChannel <- &sarama.ConsumerMessage{Value: []byte("abc"), Offset: 3}
 			consumer.wg.Wait()
 			Convey("Then an event should be published and the message should be transformed and published to the publisher", func() {
 				So(mockPublisher.AssertCalled(t, "Publish", "123"), ShouldBeTrue)
-				So(mockTransformer.AssertCalled(t, "Transform", []byte("abc")), ShouldBeTrue)
+				So(mockTransformer.AssertCalled(t, "Transform", &model.BackendEvent{Data: []byte("abc"), Offset: 3}), ShouldBeTrue)
 			})
 		})
 	})
@@ -130,7 +131,7 @@ func TestSkipMessageIfTransformerReturnsError(t *testing.T) {
 		mockKafkaConsumer.On("Messages").Return(msgChannel)
 		mockKafkaConsumer.On("Errors").Return(errorChannel)
 		mockTransformer := &mockTransformer{}
-		mockTransformer.On("Transform", []byte("abc")).Return("", theError)
+		mockTransformer.On("Transform", mock.Anything).Return("", theError)
 		mockPublisher := &mockPublisher{}
 		mockLogger := &mockLogger{}
 		mockLogger.On("Error", mock.Anything, mock.Anything).Return()
@@ -139,10 +140,10 @@ func TestSkipMessageIfTransformerReturnsError(t *testing.T) {
 		go consumer.Run()
 		Convey("When an untransformable message is consumed from Kafka", func() {
 			consumer.wg.Add(1)
-			msgChannel <- &sarama.ConsumerMessage{Value: []byte("abc")}
+			msgChannel <- &sarama.ConsumerMessage{Value: []byte("abc"), Offset: 3}
 			consumer.wg.Wait()
 			Convey("Then an event should be published, the error should be logged and no further processing should be done", func() {
-				So(mockTransformer.AssertCalled(t, "Transform", []byte("abc")), ShouldBeTrue)
+				So(mockTransformer.AssertCalled(t, "Transform", &model.BackendEvent{Data: []byte("abc"), Offset: 3}), ShouldBeTrue)
 				So(mockPublisher.AssertNotCalled(t, "Publish", mock.Anything), ShouldBeTrue)
 				So(mockLogger.AssertCalled(t, "Error", theError, []log.Data{{}}), ShouldBeTrue)
 			})
@@ -192,7 +193,7 @@ func (k *mockKafkaConsumer) Errors() <-chan *sarama.ConsumerError {
 	return args.Get(0).(chan *sarama.ConsumerError)
 }
 
-func (t *mockTransformer) Transform(message []byte) (string, error) {
+func (t *mockTransformer) Transform(message *model.BackendEvent) (string, error) {
 	args := t.Called(message)
 	return args.String(0), args.Error(1)
 }
