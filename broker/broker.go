@@ -1,6 +1,11 @@
 package broker
 
-import "errors"
+import (
+	"errors"
+	"os"
+	"os/signal"
+	"syscall"
+)
 
 //A broker to which producers will send messages published to all subscribed consumers.
 type Broker struct {
@@ -8,6 +13,7 @@ type Broker struct {
 	consumerUnsubscribed chan *Event
 	consumers            map[chan string]bool
 	data                 chan string
+	systemEvents         chan os.Signal
 }
 
 //An event that has been emitted to the given broker instance.
@@ -24,6 +30,8 @@ type Result struct {
 
 //Create a new broker instance.
 func NewBroker() *Broker {
+	systemEvents := make(chan os.Signal)
+	signal.Notify(systemEvents, syscall.SIGINT, syscall.SIGTERM)
 	return &Broker{
 		consumerSubscribed:   make(chan *Event),
 		consumerUnsubscribed: make(chan *Event),
@@ -88,6 +96,11 @@ func (b *Broker) Run() {
 			for consumer := range b.consumers {
 				consumer <- data
 			}
+		case <-b.systemEvents:
+			for consumer := range b.consumers {
+				close(consumer)
+			}
+			return
 		}
 	}
 }

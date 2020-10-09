@@ -9,9 +9,9 @@ type Serialiser struct {
 }
 
 //The result of the operation.
-type result struct {
-	data   string
-	offset int64
+type Result struct {
+	Data   string `json:"data"`
+	Offset int64 `json:"offset"`
 }
 
 //Describes an object capable of marshalling a data structure into a readable data exchange format.
@@ -33,9 +33,9 @@ func (s *Serialiser) Serialise(jsonData *json.ResourceChangedData) (string, erro
 	if err != nil {
 		return "", err
 	}
-	result, err := s.resultSerialiser.Marshal(&result{data: string(transformedData), offset: jsonData.Event.Timepoint})
+	result, err := s.resultSerialiser.Marshal(&Result{Data: string(transformedData), Offset: jsonData.Event.Timepoint})
 	if err != nil {
 		return "", err
 	}
-	return string(result), nil
+	return string(result) + "\n", nil
 }
