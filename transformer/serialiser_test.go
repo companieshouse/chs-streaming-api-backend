@@ -42,7 +42,7 @@ func TestSerialiseResourceChangedDataMessage(t *testing.T) {
 			Convey("Then the serialised result should be returned", func() {
 				So(actual, ShouldNotBeNil)
 				So(err, ShouldBeNil)
-				So(actual, ShouldResemble, []byte("result"))
+				So(actual, ShouldResemble, "result")
 				So(dataSerialiser.AssertCalled(t, "Marshal", data), ShouldBeTrue)
 				So(resultSerialiser.AssertCalled(t, "Marshal", &result{
 					data:   "data",
@@ -62,9 +62,8 @@ func TestRaiseErrorIfDataCannotBeSerialised(t *testing.T) {
 		data := &rcd.ResourceChangedData{Event: rcd.Event{Timepoint: 3}}
 		serialiser := NewSerialiser(dataSerialiser, resultSerialiser)
 		Convey("When a resource changed data message is serialised as a result", func() {
-			actual, err := serialiser.Serialise(data)
+			_, err := serialiser.Serialise(data)
 			Convey("Then the serialised result should be returned", func() {
-				So(actual, ShouldBeNil)
 				So(err, ShouldEqual, expectedError)
 				So(dataSerialiser.AssertCalled(t, "Marshal", data), ShouldBeTrue)
 				So(resultSerialiser.AssertNotCalled(t, "Marshal", mock.Anything), ShouldBeTrue)
@@ -83,9 +82,8 @@ func TestRaiseErrorIfResultCannotBeSerialised(t *testing.T) {
 		data := &rcd.ResourceChangedData{Event: rcd.Event{Timepoint: 3}}
 		serialiser := NewSerialiser(dataSerialiser, resultSerialiser)
 		Convey("When a resource changed data message is serialised as a result", func() {
-			actual, err := serialiser.Serialise(data)
+			_, err := serialiser.Serialise(data)
 			Convey("Then the serialised result should be returned", func() {
-				So(actual, ShouldBeNil)
 				So(err, ShouldEqual, expectedError)
 				So(dataSerialiser.AssertCalled(t, "Marshal", data), ShouldBeTrue)
 				So(resultSerialiser.AssertCalled(t, "Marshal", &result{

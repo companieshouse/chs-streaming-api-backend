@@ -28,10 +28,14 @@ func NewSerialiser(resourceDataSerialiser Marshallable, resultSerialiser Marshal
 }
 
 //Serialise the provided data structure into a readable data exchange format.
-func (s *Serialiser) Serialise(jsonData *json.ResourceChangedData) ([]byte, error) {
+func (s *Serialiser) Serialise(jsonData *json.ResourceChangedData) (string, error) {
 	transformedData, err := s.resourceDataSerialiser.Marshal(jsonData)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	return s.resultSerialiser.Marshal(&result{data: string(transformedData), offset: jsonData.Event.Timepoint})
+	result, err := s.resultSerialiser.Marshal(&result{data: string(transformedData), offset: jsonData.Event.Timepoint})
+	if err != nil {
+		return "", err
+	}
+	return string(result), nil
 }

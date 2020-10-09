@@ -20,7 +20,7 @@ type Deserialisable interface {
 //Describes an object capable of serialising a resource changed data object into a message that can be used by the
 //streaming API cache.
 type Serialisable interface {
-	Serialise(jsonData *json.ResourceChangedData) ([]byte, error)
+	Serialise(jsonData *json.ResourceChangedData) (string, error)
 }
 
 //Construct a new resource changed data transformer instance.
@@ -32,10 +32,10 @@ func NewResourceChangedDataTransformer(deserialiser Deserialisable, serialiser S
 }
 
 //Transform the provided resource changed data message into a format usable by streaming API cache.
-func (t *ResourceChangedDataTransformer) Transform(model *model.BackendEvent) ([]byte, error) {
+func (t *ResourceChangedDataTransformer) Transform(model *model.BackendEvent) (string, error) {
 	jsonData, err := t.deserialiser.Deserialise(model)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	return t.serialiser.Serialise(jsonData)
 }

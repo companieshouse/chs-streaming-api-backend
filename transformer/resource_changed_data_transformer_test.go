@@ -40,12 +40,12 @@ func TestTransformResourceChangedDataMessage(t *testing.T) {
 		deserialiser := &mockDeserialiser{}
 		deserialiser.On("Deserialise", mock.Anything).Return(data, nil)
 		serialiser := &mockSerialiser{}
-		serialiser.On("Serialise", mock.Anything).Return([]byte("result"), nil)
+		serialiser.On("Serialise", mock.Anything).Return("result", nil)
 		transformer := NewResourceChangedDataTransformer(deserialiser, serialiser)
 		Convey("When a resource changed data message is transformed", func() {
 			actual, err := transformer.Transform(event)
 			Convey("Then the expected result should be returned", func() {
-				So(actual, ShouldResemble, []byte("result"))
+				So(actual, ShouldResemble, "result")
 				So(err, ShouldBeNil)
 				So(deserialiser.AssertCalled(t, "Deserialise", event), ShouldBeTrue)
 				So(serialiser.AssertCalled(t, "Serialise", data), ShouldBeTrue)
@@ -66,9 +66,8 @@ func TestReturnErrorIfDeserialisationFails(t *testing.T) {
 		serialiser := &mockSerialiser{}
 		transformer := NewResourceChangedDataTransformer(deserialiser, serialiser)
 		Convey("When a resource changed data message is transformed", func() {
-			actual, err := transformer.Transform(event)
+			_, err := transformer.Transform(event)
 			Convey("Then the expected result should be returned", func() {
-				So(actual, ShouldBeNil)
 				So(err, ShouldEqual, expectedError)
 				So(deserialiser.AssertCalled(t, "Deserialise", event), ShouldBeTrue)
 				So(serialiser.AssertNotCalled(t, "Serialise", mock.Anything), ShouldBeTrue)
@@ -88,12 +87,11 @@ func TestReturnErrorIfSerialisationFails(t *testing.T) {
 		deserialiser := &mockDeserialiser{}
 		deserialiser.On("Deserialise", mock.Anything).Return(data, nil)
 		serialiser := &mockSerialiser{}
-		serialiser.On("Serialise", mock.Anything).Return([]byte(nil), expectedError)
+		serialiser.On("Serialise", mock.Anything).Return("", expectedError)
 		transformer := NewResourceChangedDataTransformer(deserialiser, serialiser)
 		Convey("When a resource changed data message is transformed", func() {
-			actual, err := transformer.Transform(event)
+			_, err := transformer.Transform(event)
 			Convey("Then the expected result should be returned", func() {
-				So(actual, ShouldBeNil)
 				So(err, ShouldEqual, expectedError)
 				So(deserialiser.AssertCalled(t, "Deserialise", event), ShouldBeTrue)
 				So(serialiser.AssertCalled(t, "Serialise", data), ShouldBeTrue)
@@ -107,7 +105,7 @@ func (d *mockDeserialiser) Deserialise(model *model.BackendEvent) (*rcd.Resource
 	return args.Get(0).(*rcd.ResourceChangedData), args.Error(1)
 }
 
-func (s *mockSerialiser) Serialise(jsonData *rcd.ResourceChangedData) ([]byte, error) {
+func (s *mockSerialiser) Serialise(jsonData *rcd.ResourceChangedData) (string, error) {
 	args := s.Called(jsonData)
-	return args.Get(0).([]byte), args.Error(1)
+	return args.String(0), args.Error(1)
 }
