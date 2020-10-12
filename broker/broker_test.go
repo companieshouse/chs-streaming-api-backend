@@ -2,6 +2,8 @@ package broker
 
 import (
 	. "github.com/smartystreets/goconvey/convey"
+	"sync"
+	"syscall"
 	"testing"
 )
 
@@ -66,6 +68,24 @@ func TestPublishMessage(t *testing.T) {
 			broker.Publish("Hello world!")
 			Convey("Then the message should be published to all subscribers", func() {
 				So(<-consumer, ShouldEqual, "Hello world!")
+			})
+		})
+	})
+}
+
+func TestStopBrokerIfSystemSignalReceived(t *testing.T) {
+	Convey("Given a running broker instance with a subscribed consumer", t, func() {
+		waitGroup := new(sync.WaitGroup)
+		broker := NewBroker()
+		broker.wg = waitGroup
+		go broker.Run()
+		_, _ = broker.Subscribe()
+		Convey("When a system signal is sent", func() {
+			waitGroup.Add(1)
+			broker.systemEvents <- syscall.SIGTERM
+			waitGroup.Wait()
+			Convey("Then all consumers should be stopped and removed", func() {
+				So(broker.consumers, ShouldBeEmpty)
 			})
 		})
 	})
