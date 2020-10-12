@@ -44,9 +44,9 @@ func TestSerialiseResourceChangedDataMessage(t *testing.T) {
 				So(err, ShouldBeNil)
 				So(actual, ShouldResemble, "result")
 				So(dataSerialiser.AssertCalled(t, "Marshal", data), ShouldBeTrue)
-				So(resultSerialiser.AssertCalled(t, "Marshal", &result{
-					data:   "data",
-					offset: 3,
+				So(resultSerialiser.AssertCalled(t, "Marshal", &Result{
+					Data:   "data",
+					Offset: 3,
 				}), ShouldBeTrue)
 			})
 		})
@@ -86,9 +86,9 @@ func TestRaiseErrorIfResultCannotBeSerialised(t *testing.T) {
 			Convey("Then the serialised result should be returned", func() {
 				So(err, ShouldEqual, expectedError)
 				So(dataSerialiser.AssertCalled(t, "Marshal", data), ShouldBeTrue)
-				So(resultSerialiser.AssertCalled(t, "Marshal", &result{
-					data:   "data",
-					offset: 3,
+				So(resultSerialiser.AssertCalled(t, "Marshal", &Result{
+					Data:   "data",
+					Offset: 3,
 				}), ShouldBeTrue)
 			})
 		})
