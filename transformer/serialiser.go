@@ -37,5 +37,5 @@ func (s *Serialiser) Serialise(jsonData *json.ResourceChangedData) (string, erro
 	if err != nil {
 		return "", err
 	}
-	return string(result), nil
+	return string(result) + "\n", nil
 }

@@ -42,7 +42,7 @@ func TestSerialiseResourceChangedDataMessage(t *testing.T) {
 			Convey("Then the serialised result should be returned", func() {
 				So(actual, ShouldNotBeNil)
 				So(err, ShouldBeNil)
-				So(actual, ShouldResemble, "result")
+				So(actual, ShouldResemble, "result\n")
 				So(dataSerialiser.AssertCalled(t, "Marshal", data), ShouldBeTrue)
 				So(resultSerialiser.AssertCalled(t, "Marshal", &Result{
 					Data:   "data",
