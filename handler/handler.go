@@ -41,6 +41,7 @@ func (h *RequestHandler) HandleRequest(writer http.ResponseWriter, request *http
 			if h.wg != nil {
 				h.wg.Done()
 			}
+			return
 		}
 	}
 }
