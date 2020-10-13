@@ -21,19 +21,26 @@ type Publishable interface {
 	Publish(msg string)
 }
 
+type KafkaConsumer interface {
+	consumer.PConsumer
+	ConsumePartition(partition int32, offset int64) error
+}
+
 //Consumes messages from the associated partition consumer, transforms these into a desired format and publishes
 //transformed messages to clients.
 type KafkaMessageConsumer struct {
-	kafkaConsumer      consumer.PConsumer
+	kafkaConsumer      KafkaConsumer
 	messageTransformer Transformable
 	publisher          Publishable
 	systemEvents       chan os.Signal
 	logger             logger.Logger
 	wg                 *sync.WaitGroup
+	partition          int32
+	offset             int64
 }
 
 //Create a new consumer wrapper instance.
-func NewConsumer(consumer consumer.PConsumer, messageTransformer Transformable, publisher Publishable, logger logger.Logger) *KafkaMessageConsumer {
+func NewConsumer(consumer KafkaConsumer, messageTransformer Transformable, publisher Publishable, partition int32, offset int64, logger logger.Logger) *KafkaMessageConsumer {
 	systemEvents := make(chan os.Signal)
 	signal.Notify(systemEvents, syscall.SIGINT, syscall.SIGTERM)
 	return &KafkaMessageConsumer{
@@ -41,12 +48,17 @@ func NewConsumer(consumer consumer.PConsumer, messageTransformer Transformable, 
 		messageTransformer: messageTransformer,
 		publisher:          publisher,
 		systemEvents:       systemEvents,
+		partition:          partition,
+		offset:             offset,
 		logger:             logger,
 	}
 }
 
 //Run this consumer instance.
 func (c *KafkaMessageConsumer) Run() {
+	if err := c.kafkaConsumer.ConsumePartition(c.partition, c.offset); err != nil {
+		panic(err)
+	}
 	for {
 		select {
 		case message := <-c.kafkaConsumer.Messages():

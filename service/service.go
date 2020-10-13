@@ -52,6 +52,8 @@ func (s *BackendService) WithTopic(topic string) *BackendService {
 			transformer.NewDeserialiser(s.schema, jsonproducer.Instance()),
 			transformer.NewSerialiser(jsonproducer.Instance(), jsonproducer.Instance())),
 		s.broker,
+		0,
+		-1,
 		logger.NewLogger())
 	return s
 }
