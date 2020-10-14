@@ -2,7 +2,6 @@ package service
 
 import (
 	"github.com/companieshouse/chs-streaming-api-backend/config"
-	"github.com/companieshouse/chs-streaming-api-backend/consumer"
 	backendhandler "github.com/companieshouse/chs-streaming-api-backend/handler"
 	"github.com/companieshouse/chs.go/avro"
 	"github.com/gorilla/mux"
@@ -23,10 +22,9 @@ func TestCreateNewService(t *testing.T) {
 		actual := NewBackendService(configuration)
 		Convey("Then a new service instance reference should be returned", func() {
 			So(actual, ShouldNotBeNil)
-			So(actual.broker, ShouldNotBeNil)
 			So(actual.schema, ShouldEqual, configuration.Schema)
-			So(actual.kafkaBrokers, ShouldResemble, configuration.Configuration.KafkaBroker)
 			So(actual.router, ShouldEqual, configuration.Router)
+			So(actual.kafkaBroker, ShouldResemble, configuration.Configuration.KafkaBroker)
 		})
 	})
 }
@@ -45,7 +43,7 @@ func TestBindKafkaTopic(t *testing.T) {
 			actual := service.WithTopic("topic")
 			Convey("Then a new partition consumer should be allocated to the service", func() {
 				So(actual, ShouldEqual, service)
-				So(service.consumer, ShouldHaveSameTypeAs, &consumer.KafkaMessageConsumer{})
+				So(actual.factory, ShouldNotBeNil)
 			})
 		})
 	})

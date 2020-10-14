@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"net/http"
 	"sync"
-	"syscall"
 	"testing"
 )
 
@@ -31,13 +30,13 @@ type mockLogger struct {
 
 func TestCreateNewConsumer(t *testing.T) {
 	Convey("When a new consumer instance is created", t, func() {
-		actual := NewConsumer(&mockKafkaConsumer{}, &mockTransformer{}, &mockPublisher{}, 1, -1, &mockLogger{})
+		actual := NewConsumer(&mockKafkaConsumer{}, &mockTransformer{}, &mockPublisher{}, 1, -1, &mockLogger{}).(*KafkaMessageConsumer)
 		Convey("Then a new consumer instance with a partition consumer and a transformed should be returned", func() {
 			So(actual, ShouldNotBeNil)
 			So(actual.kafkaConsumer, ShouldNotBeNil)
 			So(actual.messageTransformer, ShouldNotBeNil)
 			So(actual.publisher, ShouldNotBeNil)
-			So(actual.systemEvents, ShouldNotBeNil)
+			So(actual.shutdown, ShouldNotBeNil)
 			So(actual.wg, ShouldBeNil)
 			So(actual.partition, ShouldEqual, 1)
 			So(actual.offset, ShouldEqual, -1)
@@ -57,7 +56,7 @@ func TestReceiveMessageFromKafka(t *testing.T) {
 		mockTransformer.On("Transform", mock.Anything).Return("123", nil)
 		mockPublisher := &mockPublisher{}
 		mockPublisher.On("Publish", mock.Anything).Return()
-		consumer := NewConsumer(mockKafkaConsumer, mockTransformer, mockPublisher, 0, -1, &mockLogger{})
+		consumer := NewConsumer(mockKafkaConsumer, mockTransformer, mockPublisher, 0, -1, &mockLogger{}).(*KafkaMessageConsumer)
 		consumer.wg = new(sync.WaitGroup)
 		consumer.wg.Add(1)
 		go consumer.Run()
@@ -65,6 +64,7 @@ func TestReceiveMessageFromKafka(t *testing.T) {
 			msgChannel <- &sarama.ConsumerMessage{Value: []byte("abc"), Offset: 3}
 			consumer.wg.Wait()
 			Convey("Then an event should be published and the message should be transformed and published to the publisher", func() {
+				So(<-consumer.started, ShouldBeTrue)
 				So(mockKafkaConsumer.AssertCalled(t, "ConsumePartition", int32(0), int64(-1)), ShouldBeTrue)
 				So(mockPublisher.AssertCalled(t, "Publish", "123"), ShouldBeTrue)
 				So(mockTransformer.AssertCalled(t, "Transform", &model.BackendEvent{Data: []byte("abc"), Offset: 3}), ShouldBeTrue)
@@ -73,7 +73,7 @@ func TestReceiveMessageFromKafka(t *testing.T) {
 	})
 }
 
-func TestReceiveSystemSignal(t *testing.T) {
+func TestReceiveShutdownSignal(t *testing.T) {
 	Convey("Given a new consumer has been created", t, func() {
 		msgChannel := make(chan *sarama.ConsumerMessage)
 		errorChannel := make(chan *sarama.ConsumerError)
@@ -84,15 +84,19 @@ func TestReceiveSystemSignal(t *testing.T) {
 		mockKafkaConsumer.On("Close").Return(nil)
 		mockTransformer := &mockTransformer{}
 		mockPublisher := &mockPublisher{}
-		consumer := NewConsumer(mockKafkaConsumer, mockTransformer, mockPublisher, 1, -1, &mockLogger{})
+		mockLogger := &mockLogger{}
+		mockLogger.On("Info", mock.Anything, mock.Anything).Return()
+		consumer := NewConsumer(mockKafkaConsumer, mockTransformer, mockPublisher, 1, -1, mockLogger).(*KafkaMessageConsumer)
 		consumer.wg = new(sync.WaitGroup)
 		consumer.wg.Add(1)
 		go consumer.Run()
 		Convey("When a system signal is received", func() {
-			consumer.systemEvents <- syscall.SIGINT
+			consumer.Shutdown("user disconnected")
 			consumer.wg.Wait()
 			Convey("Then an event should be published and the consumer should be closed", func() {
+				So(<-consumer.started, ShouldBeTrue)
 				So(mockKafkaConsumer.AssertCalled(t, "ConsumePartition", int32(1), int64(-1)), ShouldBeTrue)
+				So(mockLogger.AssertCalled(t, "Info", "shutting down consumer: user disconnected", []log.Data(nil)), ShouldBeTrue)
 				So(mockKafkaConsumer.AssertCalled(t, "Close"), ShouldBeTrue)
 			})
 		})
@@ -115,7 +119,7 @@ func TestLogErrorsReceivedFromKafka(t *testing.T) {
 		mockPublisher := &mockPublisher{}
 		logger := &mockLogger{}
 		logger.On("Error", mock.Anything, mock.Anything).Return()
-		consumer := NewConsumer(mockKafkaConsumer, mockTransformer, mockPublisher, 0, -1, logger)
+		consumer := NewConsumer(mockKafkaConsumer, mockTransformer, mockPublisher, 0, -1, logger).(*KafkaMessageConsumer)
 		consumer.wg = new(sync.WaitGroup)
 		consumer.wg.Add(1)
 		go consumer.Run()
@@ -123,6 +127,7 @@ func TestLogErrorsReceivedFromKafka(t *testing.T) {
 			errorChannel <- theError
 			consumer.wg.Wait()
 			Convey("Then an event should be published and the message should be transformed and published to the publisher", func() {
+				So(<-consumer.started, ShouldBeTrue)
 				So(mockKafkaConsumer.AssertCalled(t, "ConsumePartition", int32(0), int64(-1)), ShouldBeTrue)
 				So(logger.AssertCalled(t, "Error", theError, []log.Data{{"topic": "the-topic"}}), ShouldBeTrue)
 			})
@@ -144,7 +149,7 @@ func TestSkipMessageIfTransformerReturnsError(t *testing.T) {
 		mockPublisher := &mockPublisher{}
 		mockLogger := &mockLogger{}
 		mockLogger.On("Error", mock.Anything, mock.Anything).Return()
-		consumer := NewConsumer(mockKafkaConsumer, mockTransformer, mockPublisher, 0, -1, mockLogger)
+		consumer := NewConsumer(mockKafkaConsumer, mockTransformer, mockPublisher, 0, -1, mockLogger).(*KafkaMessageConsumer)
 		consumer.wg = new(sync.WaitGroup)
 		consumer.wg.Add(1)
 		go consumer.Run()
@@ -152,6 +157,7 @@ func TestSkipMessageIfTransformerReturnsError(t *testing.T) {
 			msgChannel <- &sarama.ConsumerMessage{Value: []byte("abc"), Offset: 3}
 			consumer.wg.Wait()
 			Convey("Then an event should be published, the error should be logged and no further processing should be done", func() {
+				So(<-consumer.started, ShouldBeTrue)
 				So(mockKafkaConsumer.AssertCalled(t, "ConsumePartition", int32(0), int64(-1)), ShouldBeTrue)
 				So(mockTransformer.AssertCalled(t, "Transform", &model.BackendEvent{Data: []byte("abc"), Offset: 3}), ShouldBeTrue)
 				So(mockPublisher.AssertNotCalled(t, "Publish", mock.Anything), ShouldBeTrue)
@@ -174,34 +180,41 @@ func TestLogErrorWhenClosingKafkaConsumer(t *testing.T) {
 		mockTransformer := &mockTransformer{}
 		mockPublisher := &mockPublisher{}
 		logger := &mockLogger{}
+		logger.On("Info", mock.Anything, mock.Anything).Return()
 		logger.On("Error", mock.Anything, mock.Anything).Return()
-		consumer := NewConsumer(mockKafkaConsumer, mockTransformer, mockPublisher, 0, -1, logger)
+		consumer := NewConsumer(mockKafkaConsumer, mockTransformer, mockPublisher, 0, -1, logger).(*KafkaMessageConsumer)
 		consumer.wg = new(sync.WaitGroup)
 		consumer.wg.Add(1)
 		go consumer.Run()
-		Convey("When a system signal has been received", func() {
-			consumer.systemEvents <- syscall.SIGINT
+		Convey("When the consumer is shutdown", func() {
+			consumer.Shutdown("user disconnected")
 			consumer.wg.Wait()
 			Convey("Then an event should be published and the error should be logged", func() {
+				So(<-consumer.started, ShouldBeTrue)
 				So(mockKafkaConsumer.AssertCalled(t, "ConsumePartition", int32(0), int64(-1)), ShouldBeTrue)
+				So(logger.AssertCalled(t, "Info", "shutting down consumer: user disconnected", []log.Data(nil)), ShouldBeTrue)
 				So(logger.AssertCalled(t, "Error", theError, []log.Data{{}}), ShouldBeTrue)
 			})
 		})
 	})
 }
 
-func TestConsumerPanicsIfErrorReturnedWhenConsumingPartition(t *testing.T) {
+func TestNotifyNotStartedIfErrorReturnedWhenConsumingPartition(t *testing.T) {
 	Convey("Given a new consumer has been created and the partition consumer will return an error", t, func() {
 		expectedError := errors.New("something went wrong")
 		mockKafkaConsumer := &mockKafkaConsumer{}
 		mockKafkaConsumer.On("ConsumePartition", mock.Anything, mock.Anything).Return(expectedError)
 		mockTransformer := &mockTransformer{}
 		mockPublisher := &mockPublisher{}
-		consumer := NewConsumer(mockKafkaConsumer, mockTransformer, mockPublisher, 0, -1, &mockLogger{})
+		mockLogger := &mockLogger{}
+		mockLogger.On("Error", mock.Anything, []log.Data(nil)).Return()
+		consumer := NewConsumer(mockKafkaConsumer, mockTransformer, mockPublisher, 0, -1, mockLogger).(*KafkaMessageConsumer)
 		Convey("When the consumer is started", func() {
-			Convey("Then the consumer should panic", func() {
-				So(consumer.Run, ShouldPanicWith, expectedError)
+			go consumer.Run()
+			Convey("Then a message should be published indicating the consumer hasn't started", func() {
+				So(consumer.HasStarted(), ShouldBeFalse)
 				So(mockKafkaConsumer.AssertCalled(t, "ConsumePartition", int32(0), int64(-1)), ShouldBeTrue)
+				So(mockLogger.AssertCalled(t, "Error", expectedError, []log.Data(nil)), ShouldBeTrue)
 			})
 		})
 	})
@@ -246,4 +259,8 @@ func (l *mockLogger) Info(msg string, data ...log.Data) {
 
 func (l *mockLogger) InfoR(req *http.Request, msg string, data ...log.Data) {
 	l.Called(req, msg, data)
+}
+
+func (l *mockLogger) ErrorR(req *http.Request, err error, data ...log.Data) {
+	l.Called(req, err, data)
 }
