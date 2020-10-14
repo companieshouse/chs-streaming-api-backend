@@ -24,7 +24,7 @@ type Runner struct {
 	broker          backendconsumer.Publishable
 	offset          int64
 	partition       int32
-	constructor     func(backendconsumer.KafkaConsumer, backendconsumer.Transformable, backendconsumer.Publishable, int32, int64, logger.Logger) backendconsumer.Runnable
+	constructor     func(backendconsumer.KafkaPartitionConsumable, backendconsumer.Transformable, backendconsumer.Publishable, int32, int64, logger.Logger) backendconsumer.Runnable
 }
 
 type publisher struct {

@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-type mockConsumerManager struct {
+type mockConsumerRunner struct {
 	mock.Mock
 }
 
@@ -30,14 +30,14 @@ type mockLogger struct {
 }
 
 func TestCreateNewRequestHandler(t *testing.T) {
-	Convey("Given an existing broker instance", t, func() {
-		consumerManager := &mockConsumerManager{}
+	Convey("Given an existing consumer runner", t, func() {
+		consumerRunner := &mockConsumerRunner{}
 		logger := &mockLogger{}
 		Convey("When a new request handler instance is created", func() {
-			actual := NewRequestHandler(consumerManager, logger)
+			actual := NewRequestHandler(consumerRunner, logger)
 			Convey("Then a new request handler instance should be returned", func() {
 				So(actual, ShouldNotBeNil)
-				So(actual.runner, ShouldEqual, consumerManager)
+				So(actual.runner, ShouldEqual, consumerRunner)
 				So(actual.logger, ShouldEqual, logger)
 				So(actual.wg, ShouldBeNil)
 			})
@@ -46,8 +46,8 @@ func TestCreateNewRequestHandler(t *testing.T) {
 }
 
 func TestWritePublishedMessageToResponseWriter(t *testing.T) {
-	Convey("Given a running request handler", t, func() {
-		consumerManager := &mockConsumerManager{}
+	Convey("Given a user is connected to the request handler", t, func() {
+		consumerManager := &mockConsumerRunner{}
 		subscription := make(chan string)
 		mockController := &mockController{}
 		consumerManager.On("StartConsumer", mock.Anything).Return(mockController, nil)
@@ -66,24 +66,24 @@ func TestWritePublishedMessageToResponseWriter(t *testing.T) {
 			subscription <- "Hello world"
 			waitGroup.Wait()
 			output, _ := response.Body.ReadString('\n')
-			Convey("Then the message should be written to the output stream", func() {
+			Convey("Then the message should be written to the response body", func() {
+				So(output, ShouldEqual, "Hello world")
 				So(logger.AssertCalled(t, "InfoR", request, "user connected", []log.Data(nil)), ShouldBeTrue)
 				So(consumerManager.AssertCalled(t, "StartConsumer", int64(-1)), ShouldBeTrue)
 				So(mockController.AssertCalled(t, "Data"), ShouldBeTrue)
-				So(output, ShouldEqual, "Hello world")
 			})
 		})
 	})
 }
 
 func TestHandlerUnsubscribesIfUserDisconnects(t *testing.T) {
-	Convey("Given a running request handler", t, func() {
+	Convey("Given a user is connected to the request handler", t, func() {
 		requestComplete := make(chan struct{})
 		subscription := make(chan string)
 		mockController := &mockController{}
 		mockController.On("Data").Return(subscription)
 		mockController.On("Stop", mock.Anything).Return()
-		consumerManager := &mockConsumerManager{}
+		consumerManager := &mockConsumerRunner{}
 		consumerManager.On("StartConsumer", mock.Anything).Return(mockController, nil)
 		logger := &mockLogger{}
 		logger.On("InfoR", mock.Anything, mock.Anything, mock.Anything).Return()
@@ -100,10 +100,10 @@ func TestHandlerUnsubscribesIfUserDisconnects(t *testing.T) {
 			waitGroup.Add(1)
 			requestComplete <- struct{}{}
 			waitGroup.Wait()
-			Convey("Then the consumerManager should be unsubscribed from the consumerManager", func() {
+			Convey("Then the consumer should be stopped", func() {
+				So(mockController.AssertCalled(t, "Stop", "user disconnected"), ShouldBeTrue)
 				So(logger.AssertCalled(t, "InfoR", request, "user connected", []log.Data(nil)), ShouldBeTrue)
 				So(consumerManager.AssertCalled(t, "StartConsumer", int64(-1)), ShouldBeTrue)
-				So(mockController.AssertCalled(t, "Stop", "user disconnected"), ShouldBeTrue)
 				So(logger.AssertCalled(t, "InfoR", request, "user disconnected", []log.Data(nil)), ShouldBeTrue)
 			})
 		})
@@ -112,7 +112,7 @@ func TestHandlerUnsubscribesIfUserDisconnects(t *testing.T) {
 
 func TestHandlerReturnsBadRequestIfInvalidOffsetFormatSpecified(t *testing.T) {
 	Convey("Given a request handler instance", t, func() {
-		consumerManager := &mockConsumerManager{}
+		consumerManager := &mockConsumerRunner{}
 		logger := &mockLogger{}
 		logger.On("InfoR", mock.Anything, mock.Anything, mock.Anything).Return()
 		logger.On("ErrorR", mock.Anything, mock.Anything, mock.Anything).Return()
@@ -137,7 +137,7 @@ func TestHandlerReturnsBadRequestIfInvalidOffsetFormatSpecified(t *testing.T) {
 func TestHandlerReturnsInternalServerErrorIfConsumerReturnsError(t *testing.T) {
 	Convey("Given an error will be raised when the consumer is launched by the request handler", t, func() {
 		expectedError := errors.New("something went wrong")
-		consumerManager := &mockConsumerManager{}
+		consumerManager := &mockConsumerRunner{}
 		mockController := &mockController{}
 		consumerManager.On("StartConsumer", mock.Anything).Return(mockController, expectedError)
 		logger := &mockLogger{}
@@ -161,7 +161,7 @@ func TestHandlerReturnsInternalServerErrorIfConsumerReturnsError(t *testing.T) {
 	})
 }
 
-func (s *mockConsumerManager) StartConsumer(offset int64) (runner.Controllable, error) {
+func (s *mockConsumerRunner) StartConsumer(offset int64) (runner.Controllable, error) {
 	args := s.Called(offset)
 	return args.Get(0).(runner.Controllable), args.Error(1)
 }

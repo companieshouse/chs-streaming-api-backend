@@ -47,6 +47,6 @@ func (s *BackendService) WithTopic(topic string) *BackendService {
 }
 
 func (s *BackendService) WithPath(path string) *BackendService {
-	s.router.Path(path).Methods("GET").HandlerFunc(handler.NewRequestHandler(s.factory, logger.NewLogger()).HandleRequest)
+	s.router.Path(path).Methods(http.MethodGet).HandlerFunc(handler.NewRequestHandler(s.factory, logger.NewLogger()).HandleRequest)
 	return s
 }

@@ -31,7 +31,7 @@ type mockLogger struct {
 func TestCreateNewConsumer(t *testing.T) {
 	Convey("When a new consumer instance is created", t, func() {
 		actual := NewConsumer(&mockKafkaConsumer{}, &mockTransformer{}, &mockPublisher{}, 1, -1, &mockLogger{}).(*KafkaMessageConsumer)
-		Convey("Then a new consumer instance with a partition consumer and a transformed should be returned", func() {
+		Convey("Then a new consumer instance should be returned", func() {
 			So(actual, ShouldNotBeNil)
 			So(actual.kafkaConsumer, ShouldNotBeNil)
 			So(actual.messageTransformer, ShouldNotBeNil)
@@ -63,7 +63,7 @@ func TestReceiveMessageFromKafka(t *testing.T) {
 		Convey("When a message is consumed from Kafka", func() {
 			msgChannel <- &sarama.ConsumerMessage{Value: []byte("abc"), Offset: 3}
 			consumer.wg.Wait()
-			Convey("Then an event should be published and the message should be transformed and published to the publisher", func() {
+			Convey("Then the message should be transformed and published to the publisher", func() {
 				So(<-consumer.started, ShouldBeTrue)
 				So(mockKafkaConsumer.AssertCalled(t, "ConsumePartition", int32(0), int64(-1)), ShouldBeTrue)
 				So(mockPublisher.AssertCalled(t, "Publish", "123"), ShouldBeTrue)
@@ -123,10 +123,10 @@ func TestLogErrorsReceivedFromKafka(t *testing.T) {
 		consumer.wg = new(sync.WaitGroup)
 		consumer.wg.Add(1)
 		go consumer.Run()
-		Convey("When a message is consumed from Kafka", func() {
+		Convey("When an error is consumed from Kafka", func() {
 			errorChannel <- theError
 			consumer.wg.Wait()
-			Convey("Then an event should be published and the message should be transformed and published to the publisher", func() {
+			Convey("Then the error should be logged", func() {
 				So(<-consumer.started, ShouldBeTrue)
 				So(mockKafkaConsumer.AssertCalled(t, "ConsumePartition", int32(0), int64(-1)), ShouldBeTrue)
 				So(logger.AssertCalled(t, "Error", theError, []log.Data{{"topic": "the-topic"}}), ShouldBeTrue)
@@ -156,7 +156,7 @@ func TestSkipMessageIfTransformerReturnsError(t *testing.T) {
 		Convey("When an untransformable message is consumed from Kafka", func() {
 			msgChannel <- &sarama.ConsumerMessage{Value: []byte("abc"), Offset: 3}
 			consumer.wg.Wait()
-			Convey("Then an event should be published, the error should be logged and no further processing should be done", func() {
+			Convey("Then the error should be logged and the message should not be published", func() {
 				So(<-consumer.started, ShouldBeTrue)
 				So(mockKafkaConsumer.AssertCalled(t, "ConsumePartition", int32(0), int64(-1)), ShouldBeTrue)
 				So(mockTransformer.AssertCalled(t, "Transform", &model.BackendEvent{Data: []byte("abc"), Offset: 3}), ShouldBeTrue)
@@ -168,7 +168,7 @@ func TestSkipMessageIfTransformerReturnsError(t *testing.T) {
 }
 
 func TestLogErrorWhenClosingKafkaConsumer(t *testing.T) {
-	Convey("Given a consumer is running", t, func() {
+	Convey("Given a consumer is running and an error will be raised when the Kafka consumer is closed", t, func() {
 		msgChannel := make(chan *sarama.ConsumerMessage)
 		errorChannel := make(chan *sarama.ConsumerError)
 		theError := errors.New("something went wrong")
@@ -189,7 +189,7 @@ func TestLogErrorWhenClosingKafkaConsumer(t *testing.T) {
 		Convey("When the consumer is shutdown", func() {
 			consumer.Shutdown("user disconnected")
 			consumer.wg.Wait()
-			Convey("Then an event should be published and the error should be logged", func() {
+			Convey("Then the error should be logged", func() {
 				So(<-consumer.started, ShouldBeTrue)
 				So(mockKafkaConsumer.AssertCalled(t, "ConsumePartition", int32(0), int64(-1)), ShouldBeTrue)
 				So(logger.AssertCalled(t, "Info", "shutting down consumer: user disconnected", []log.Data(nil)), ShouldBeTrue)

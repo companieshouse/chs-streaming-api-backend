@@ -86,8 +86,8 @@ func (r *mockRunnable) HasStarted() bool {
 	return args.Bool(0)
 }
 
-func mockConsumerConstructor(r consumer.Runnable) func(consumer consumer.KafkaConsumer, messageTransformer consumer.Transformable, publisher consumer.Publishable, partition int32, offset int64, logger logger.Logger) consumer.Runnable {
-	return func(consumer consumer.KafkaConsumer, messageTransformer consumer.Transformable, publisher consumer.Publishable, partition int32, offset int64, logger logger.Logger) consumer.Runnable {
+func mockConsumerConstructor(r consumer.Runnable) func(consumer consumer.KafkaPartitionConsumable, messageTransformer consumer.Transformable, publisher consumer.Publishable, partition int32, offset int64, logger logger.Logger) consumer.Runnable {
+	return func(consumer consumer.KafkaPartitionConsumable, messageTransformer consumer.Transformable, publisher consumer.Publishable, partition int32, offset int64, logger logger.Logger) consumer.Runnable {
 		return r
 	}
 }

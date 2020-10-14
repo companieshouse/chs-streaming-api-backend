@@ -24,7 +24,7 @@ type Runnable interface {
 	Shutdown(msg string)
 }
 
-type KafkaConsumer interface {
+type KafkaPartitionConsumable interface {
 	consumer.PConsumer
 	ConsumePartition(partition int32, offset int64) error
 }
@@ -32,7 +32,7 @@ type KafkaConsumer interface {
 //Consumes messages from the associated partition consumer, transforms these into a desired format and publishes
 //transformed messages to clients.
 type KafkaMessageConsumer struct {
-	kafkaConsumer      KafkaConsumer
+	kafkaConsumer      KafkaPartitionConsumable
 	messageTransformer Transformable
 	publisher          Publishable
 	shutdown           chan string
@@ -44,7 +44,7 @@ type KafkaMessageConsumer struct {
 }
 
 //Create a new consumer wrapper instance.
-func NewConsumer(consumer KafkaConsumer, messageTransformer Transformable, publisher Publishable, partition int32, offset int64, logger logger.Logger) Runnable {
+func NewConsumer(consumer KafkaPartitionConsumable, messageTransformer Transformable, publisher Publishable, partition int32, offset int64, logger logger.Logger) Runnable {
 	return &KafkaMessageConsumer{
 		kafkaConsumer:      consumer,
 		messageTransformer: messageTransformer,

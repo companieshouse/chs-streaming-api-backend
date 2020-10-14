@@ -8,6 +8,12 @@ import (
 	"sync"
 )
 
+const (
+	offsetRequestParam  = "offset"
+	msgUserConnected    = "user connected"
+	msgUserDisconnected = "user disconnected"
+)
+
 type RequestHandler struct {
 	runner Controllable
 	logger logger.Logger
@@ -28,8 +34,8 @@ func NewRequestHandler(runner Controllable, logger logger.Logger) *RequestHandle
 func (h *RequestHandler) HandleRequest(writer http.ResponseWriter, request *http.Request) {
 	var offset int64 = -1
 	var err error
-	h.logger.InfoR(request, "user connected")
-	if offsetParam := request.URL.Query().Get("offset"); offsetParam != "" {
+	h.logger.InfoR(request, msgUserConnected)
+	if offsetParam := request.URL.Query().Get(offsetRequestParam); offsetParam != "" {
 		offset, err = strconv.ParseInt(offsetParam, 10, 64)
 		if err != nil {
 			h.logger.ErrorR(request, err)
@@ -52,8 +58,8 @@ func (h *RequestHandler) HandleRequest(writer http.ResponseWriter, request *http
 				h.wg.Done()
 			}
 		case <-request.Context().Done():
-			controller.Stop("user disconnected")
-			h.logger.InfoR(request, "user disconnected")
+			controller.Stop(msgUserDisconnected)
+			h.logger.InfoR(request, msgUserDisconnected)
 			if h.wg != nil {
 				h.wg.Done()
 			}

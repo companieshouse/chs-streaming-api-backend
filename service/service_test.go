@@ -20,7 +20,7 @@ func TestCreateNewService(t *testing.T) {
 			Router: pat.New(),
 		}
 		actual := NewBackendService(configuration)
-		Convey("Then a new service instance reference should be returned", func() {
+		Convey("Then a new service instance should be returned", func() {
 			So(actual, ShouldNotBeNil)
 			So(actual.schema, ShouldEqual, configuration.Schema)
 			So(actual.router, ShouldEqual, configuration.Router)
@@ -41,7 +41,7 @@ func TestBindKafkaTopic(t *testing.T) {
 		service := NewBackendService(configuration)
 		Convey("When a kafka topic is bound to it", func() {
 			actual := service.WithTopic("topic")
-			Convey("Then a new partition consumer should be allocated to the service", func() {
+			Convey("Then a new consumer factory should be allocated to the service", func() {
 				So(actual, ShouldEqual, service)
 				So(actual.factory, ShouldNotBeNil)
 			})
