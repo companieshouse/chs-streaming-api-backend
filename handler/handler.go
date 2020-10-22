@@ -49,6 +49,7 @@ func (h *RequestHandler) HandleRequest(writer http.ResponseWriter, request *http
 		writer.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	writer.WriteHeader(http.StatusOK)
 	for {
 		select {
 		case msg := <-controller.Data():

@@ -67,6 +67,7 @@ func TestWritePublishedMessageToResponseWriter(t *testing.T) {
 			waitGroup.Wait()
 			output, _ := response.Body.ReadString('\n')
 			Convey("Then the message should be written to the response body", func() {
+				So(response.Code, ShouldEqual, 200)
 				So(output, ShouldEqual, "Hello world")
 				So(logger.AssertCalled(t, "InfoR", request, "user connected", []log.Data(nil)), ShouldBeTrue)
 				So(consumerManager.AssertCalled(t, "StartConsumer", int64(-1)), ShouldBeTrue)
@@ -101,6 +102,7 @@ func TestHandlerUnsubscribesIfUserDisconnects(t *testing.T) {
 			requestComplete <- struct{}{}
 			waitGroup.Wait()
 			Convey("Then the consumer should be stopped", func() {
+				So(response.Code, ShouldEqual, 200)
 				So(mockController.AssertCalled(t, "Stop", "user disconnected"), ShouldBeTrue)
 				So(logger.AssertCalled(t, "InfoR", request, "user connected", []log.Data(nil)), ShouldBeTrue)
 				So(consumerManager.AssertCalled(t, "StartConsumer", int64(-1)), ShouldBeTrue)
