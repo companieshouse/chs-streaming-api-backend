@@ -9,6 +9,7 @@ type Logger interface {
 	Error(err error, data ...log.Data)
 	Info(msg string, data ...log.Data)
 	InfoR(req *http.Request, message string, data ...log.Data)
+	ErrorR(req *http.Request, err error, data ...log.Data)
 }
 
 var logger LoggerImpl
@@ -30,4 +31,8 @@ func (l *LoggerImpl) Info(msg string, data ...log.Data) {
 
 func (l *LoggerImpl) InfoR(req *http.Request, message string, data ...log.Data) {
 	log.InfoR(req, message, data...)
+}
+
+func (l *LoggerImpl) ErrorR(req *http.Request, err error, data ...log.Data) {
+	log.ErrorR(req, err, data...)
 }

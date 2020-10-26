@@ -45,12 +45,12 @@ func main() {
 		Router:        svc.Router(),
 	}
 
-	service.NewBackendService(backendConfiguration).WithTopic(filingHistoryStream).WithPath("/filings").Start()
-	service.NewBackendService(backendConfiguration).WithTopic(companyProfileStream).WithPath("/companies").Start()
-	service.NewBackendService(backendConfiguration).WithTopic(companyInsolvencyStream).WithPath("/insolvency-cases").Start()
-	service.NewBackendService(backendConfiguration).WithTopic(companyChargesStream).WithPath("/charges").Start()
-	service.NewBackendService(backendConfiguration).WithTopic(companyOfficersStream).WithPath("/officers").Start()
-	service.NewBackendService(backendConfiguration).WithTopic(companyPSCStream).WithPath("/persons-with-significant-control").Start()
+	service.NewBackendService(backendConfiguration).WithTopic(filingHistoryStream).WithPath("/filings")
+	service.NewBackendService(backendConfiguration).WithTopic(companyProfileStream).WithPath("/companies")
+	service.NewBackendService(backendConfiguration).WithTopic(companyInsolvencyStream).WithPath("/insolvency-cases")
+	service.NewBackendService(backendConfiguration).WithTopic(companyChargesStream).WithPath("/charges")
+	service.NewBackendService(backendConfiguration).WithTopic(companyOfficersStream).WithPath("/officers")
+	service.NewBackendService(backendConfiguration).WithTopic(companyPSCStream).WithPath("/persons-with-significant-control")
 
 	svc.Router().Path("/healthcheck").Methods("GET").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
