@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Start script for chs-streaming-api-frontend
+# Start script for chs-streaming-api-backend
 
 APP_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
@@ -9,7 +9,7 @@ if [[ -z "${MESOS_SLAVE_PID}" ]]; then
     source ~/.chs_env/global_env
     source ~/.chs_env/chs-streaming-api-backend/env
 
-    PORT="${CHS_STREAMING_API_FRONTEND_PORT:=6000}"
+    PORT="${CHS_STREAMING_API_BACKEND_PORT:=6000}"
 else
     PORT="$1"
     CONFIG_URL="$2"
