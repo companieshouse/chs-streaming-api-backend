@@ -1,5 +1,5 @@
 app_name: chs-streaming-api-backend
-group: standalone
+group: internalapi
 weight: 200
 routes:
   1: ^/filings
