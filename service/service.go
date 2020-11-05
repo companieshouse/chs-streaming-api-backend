@@ -16,6 +16,7 @@ type BackendService struct {
 	schema      *avro.Schema
 	factory     *runner.Runner
 	router      *pat.Router
+	prefix      string
 }
 
 type Router interface {
@@ -27,6 +28,7 @@ type BackendConfiguration struct {
 	Schema        *avro.Schema
 	Router        *pat.Router
 	Topic         string
+	Prefix        string
 }
 
 func NewBackendService(cfg *BackendConfiguration) *BackendService {
@@ -34,6 +36,7 @@ func NewBackendService(cfg *BackendConfiguration) *BackendService {
 		router:      cfg.Router,
 		kafkaBroker: cfg.Configuration.KafkaBroker,
 		schema:      cfg.Schema,
+		prefix:      cfg.Prefix,
 	}
 }
 
@@ -47,6 +50,6 @@ func (s *BackendService) WithTopic(topic string) *BackendService {
 }
 
 func (s *BackendService) WithPath(path string) *BackendService {
-	s.router.Path(path).Methods(http.MethodGet).HandlerFunc(handler.NewRequestHandler(s.factory, logger.NewLogger()).HandleRequest)
+	s.router.Path(s.prefix + path).Methods(http.MethodGet).HandlerFunc(handler.NewRequestHandler(s.factory, logger.NewLogger()).HandleRequest)
 	return s
 }

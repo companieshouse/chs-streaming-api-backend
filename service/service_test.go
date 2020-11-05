@@ -18,6 +18,7 @@ func TestCreateNewService(t *testing.T) {
 			},
 			Schema: &avro.Schema{},
 			Router: pat.New(),
+			Prefix: "/prefix",
 		}
 		actual := NewBackendService(configuration)
 		Convey("Then a new service instance should be returned", func() {
@@ -25,6 +26,7 @@ func TestCreateNewService(t *testing.T) {
 			So(actual.schema, ShouldEqual, configuration.Schema)
 			So(actual.router, ShouldEqual, configuration.Router)
 			So(actual.kafkaBroker, ShouldResemble, configuration.Configuration.KafkaBroker)
+			So(actual.prefix, ShouldEqual, "/prefix")
 		})
 	})
 }
@@ -57,6 +59,7 @@ func TestAttachRequestHandler(t *testing.T) {
 			},
 			Schema: &avro.Schema{},
 			Router: pat.New(),
+			Prefix: "/prefix",
 		}
 		service := NewBackendService(configuration)
 		Convey("When a request handler is attached to it", func() {
@@ -67,7 +70,7 @@ func TestAttachRequestHandler(t *testing.T) {
 					path, _ := r.GetPathTemplate()
 					methods, _ := r.GetMethods()
 					handler := r.GetHandler()
-					So(path, ShouldEqual, "/path")
+					So(path, ShouldEqual, "/prefix/path")
 					So(methods, ShouldResemble, []string{"GET"})
 					So(handler, ShouldEqual, (&backendhandler.RequestHandler{}).HandleRequest)
 					return nil
