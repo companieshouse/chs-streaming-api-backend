@@ -21,6 +21,7 @@ const (
 	companyChargesStream    = "stream-company-charges"
 	companyOfficersStream   = "stream-company-officers"
 	companyPSCStream        = "stream-company-psc"
+	servicePrefix           = "/streaming-api-backend"
 )
 
 func main() {
@@ -43,6 +44,7 @@ func main() {
 		Configuration: config,
 		Schema:        rcdAvroSchema,
 		Router:        svc.Router(),
+		Prefix:        servicePrefix,
 	}
 
 	service.NewBackendService(backendConfiguration).WithTopic(filingHistoryStream).WithPath("/filings")
