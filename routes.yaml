@@ -2,9 +2,9 @@ app_name: chs-streaming-api-backend
 group: internalapi
 weight: 200
 routes:
-  1: ^/filings
-  2: ^/companies
-  3: ^/insolvency-cases
-  4: ^/charges
-  5: ^/officers
-  6: ^/persons-with-significant-control
+  1: ^/streaming-api-backend/filings
+  2: ^/streaming-api-backend/companies
+  3: ^/streaming-api-backend/insolvency-cases
+  4: ^/streaming-api-backend/charges
+  5: ^/streaming-api-backend/officers
+  6: ^/streaming-api-backend/persons-with-significant-control
