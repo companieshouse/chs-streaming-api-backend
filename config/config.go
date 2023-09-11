@@ -1,13 +1,13 @@
 package config
 
-import "github.com/ian-kent/gofigure"
+import "github.com/companieshouse/gofigure"
 
 type Config struct {
 	gofigure          interface{} `order:"env,flag"`
 	BindAddress       string      `env:"BIND_ADDRESS" flag:"bind-address"`
-	CertFile          string      `env:"CERT_FILE" flag:"cert-file"`
+	CertFile          string      `env:"CERT_FILE" flag:"cert-file" json:"-"`
 	KafkaBroker       []string    `env:"KAFKA_STREAMING_BROKER_ADDR" flag:"kafka-broker-addr"`
-	KeyFile           string      `env:"KEY_FILE" flag:"key-file"`
+	KeyFile           string      `env:"KEY_FILE" flag:"key-file" json:"-"`
 	SchemaRegistryURL string      `env:"SCHEMA_REGISTRY_URL" flag:"schema-registry-url"`
 }
 

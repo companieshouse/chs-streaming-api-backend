@@ -1,6 +1,6 @@
 package avro
 
-//An incoming resource changed data message serialised as avro
+// An incoming resource changed data message serialised as avro
 type ResourceChangedData struct {
 	ResourceKind string      `avro:"resource_kind"`
 	ResourceURI  string      `avro:"resource_uri"`
@@ -10,7 +10,7 @@ type ResourceChangedData struct {
 	Event        EventRecord `avro:"event"`
 }
 
-//Event metadata within a resource changed data message
+// Event metadata within a resource changed data message
 type EventRecord struct {
 	PublishedAt   string   `avro:"published_at"`
 	Type          string   `avro:"type"`
