@@ -8,12 +8,12 @@ import (
 	"sync"
 )
 
-//Describes an object capable of transforming on given representation into another.
+// Describes an object capable of transforming on given representation into another.
 type Transformable interface {
 	Transform(message *model.BackendEvent) (string, error)
 }
 
-//Describes an object capable of publishing a message.
+// Describes an object capable of publishing a message.
 type Publishable interface {
 	Publish(msg string)
 }
@@ -29,8 +29,8 @@ type KafkaPartitionConsumable interface {
 	ConsumePartition(partition int32, offset int64) error
 }
 
-//Consumes messages from the associated partition consumer, transforms these into a desired format and publishes
-//transformed messages to clients.
+// Consumes messages from the associated partition consumer, transforms these into a desired format and publishes
+// transformed messages to clients.
 type KafkaMessageConsumer struct {
 	kafkaConsumer      KafkaPartitionConsumable
 	messageTransformer Transformable
@@ -43,7 +43,7 @@ type KafkaMessageConsumer struct {
 	started            chan bool
 }
 
-//Create a new consumer wrapper instance.
+// Create a new consumer wrapper instance.
 func NewConsumer(consumer KafkaPartitionConsumable, messageTransformer Transformable, publisher Publishable, partition int32, offset int64, logger logger.Logger) Runnable {
 	return &KafkaMessageConsumer{
 		kafkaConsumer:      consumer,
@@ -57,7 +57,7 @@ func NewConsumer(consumer KafkaPartitionConsumable, messageTransformer Transform
 	}
 }
 
-//Run this consumer instance.
+// Run this consumer instance.
 func (c *KafkaMessageConsumer) Run() {
 	if err := c.kafkaConsumer.ConsumePartition(c.partition, c.offset); err != nil {
 		c.logger.Error(err)
